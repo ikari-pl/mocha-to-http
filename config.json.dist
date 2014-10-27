@@ -1,0 +1,9 @@
+{
+  "default_reporter": "tap",
+  "cwd": "subject",
+  "commands": {
+    "before": ['git pull'],
+    "test": 'mocha --reporter #{reporter}',
+    "after": []
+  }
+}

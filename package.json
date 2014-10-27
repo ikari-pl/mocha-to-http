@@ -1,0 +1,29 @@
+{
+  "name": "mocha-to-http",
+  "version": "0.1.0",
+  "description": "HTTP mocha wrapper - exposes mocha test results via HTTP, run on request.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ikari-pl/mocha-to-http.git"
+  },
+  "keywords": [
+    "mocha",
+    "node.js",
+    "express"
+  ],
+  "author": "Cezar “ikari” Pokorski <git@ikari.pl>",
+  "license": "BSD-2-Clause",
+  "bugs": {
+    "url": "https://github.com/ikari-pl/mocha-to-http/issues"
+  },
+  "dependencies": {
+    "git": "~0.1.5",
+    "mocha": "~2.0.1",
+    "express": "~4.10.0",
+    "path": "~0.4.9"
+  }
+}
