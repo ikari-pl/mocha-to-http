@@ -5,15 +5,15 @@ var git = require('git'),
     express = require('express'),
     exec = require('child_process').exec,
     app = express(),
+    dir = process.cwd(),
     server;
 
 function get_mocha_cmd(config) {
-  return config.commands.test ?
-    config.commands.test.replace('#{reporter}', config.default_reporter) :
-    "node " + path.join("node_modules", "bin", "mocha");
+  return config.commands.test ||
+    "node " + path.join("node_modules", ".bin", "mocha") + ' -C --reporter #{reporter}';
 };
 
-function run_sequence(commands, out_stream, err_stream, done) {
+function run_sequence(commands, res, done) {
   var cmd = commands[0];
   if (cmd) {
     console.log(cmd);
@@ -21,14 +21,20 @@ function run_sequence(commands, out_stream, err_stream, done) {
       if (error !== null) {
         // Something bad happened
         console.warn('Oops: ');
-        console.err(error);
+        console.error(error);
         // and do not proceed.
+        res.status(503);
+        res.write(JSON.stringify({
+          error: error,
+          message: stderr
+        }));
+        res.end();
       } else {
         // print stuff
-        out_stream.write(stdout);
-        err_stream.write(stderr);
+        res.write(stdout);
+        process.stderr.write(stderr);
         // and proceed to the next one
-        run_sequence(commands.slice(1), out_stream, err_stream);
+        run_sequence(commands.slice(1), res, done);
       }
     })
   } else {
@@ -41,20 +47,35 @@ function run_sequence(commands, out_stream, err_stream, done) {
 
 app.get('/', function (req, res) {
   var conf = require('./config.json'),
-    addr = server.address();
-  conf['To execute the tests, go here: '] =
-    'http://' + addr.address + ':' + addr.port + '/test';
+    addr = server.address(),
+    url = 'http://' + addr.address + ':' + addr.port + '/test';
+  conf['To execute the tests, go here: '] = url;
+  conf[' or specify a reporter: '] = url+'?reporter=tap'
   res.send(conf);
 });
 
 app.get('/test', function (req, res) {
   var conf = require('./config.json'),
-  commands = conf.commands.before || [];
-  commands.concat([get_mocha_cmd(conf)]);
-  commands.concat(conf.commands.after);
+    reporter = req.param('reporter') || conf.default_reporter,
+    commands;
 
-  run_sequence(commands, res, process.stderr, function() {
+  // sanitize
+  reporter = reporter.replace(/[^A-Za-z_-]/, '');
+  // reset to my home
+  process.chdir(dir);
+  // and chdir from there
+  process.chdir(conf.cwd);
+  console.log('cd ' + process.cwd());
+
+  commands = (conf.commands.before || []).concat();
+  commands.push(get_mocha_cmd(conf).replace('#{reporter}', reporter ));
+  commands = commands.concat(conf.commands.after);
+
+  console.log(commands);
+
+  run_sequence(commands, res, function() {
     res.end();
+    process.chdir(dir);
   })
 });
 
