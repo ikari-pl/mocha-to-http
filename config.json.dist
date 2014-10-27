@@ -2,7 +2,7 @@
   "default_reporter": "tap",
   "cwd": "subject",
   "commands": {
-    "before": ['git pull'],
+    "before": ["git pull origin master 1>&2"],
     "test": 'mocha --reporter #{reporter}',
     "after": []
   }
