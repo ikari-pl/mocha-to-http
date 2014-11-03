@@ -6,7 +6,27 @@ var git = require('git'),
     exec = require('child_process').exec,
     app = express(),
     dir = process.cwd(),
+    config = require('./config.json'),
     server;
+
+
+var clc = require("cli-color");
+var mapping = {
+  log: clc.greenBright,
+  warn: clc.yellow,
+  error: clc.red
+};
+["log", "warn", "error"].forEach(function(method) {
+  var oldMethod = console[method].bind(console);
+  console[method] = function() {
+    oldMethod.apply(
+      console,
+      [mapping[method](new Date().toISOString()) + ' ' + arguments[0]]
+	.concat([].slice.call(arguments, 1))
+    );
+  };
+});
+
 
 function get_mocha_cmd(config) {
   return config.commands.test ||
@@ -19,22 +39,31 @@ function run_sequence(commands, res, done) {
     console.log(cmd);
     exec(cmd, function(error, stdout, stderr) {
       if (error !== null) {
-        // Something bad happened
-        console.warn('Oops: ');
-        console.error(error);
-        // and do not proceed.
-        res.status(503);
-        res.write(JSON.stringify({
-          error: error,
-          message: stderr
-        }));
-        res.end();
+	// Something bad happened
+	console.warn('Oops: ');
+	console.error(error);
+	if (/mocha/.test(cmd)) { // TODO: do it cleaner
+	  console.warn('mocha tests failed');
+	  res.status(200);
+	  res.write(stdout);
+	  res.write(stderr);
+	  res.end();
+	  run_sequence(commands.slice(1), res, done);
+	} else {
+	  // and do not proceed.
+	  res.status(503);
+	  res.write(JSON.stringify({
+	    error: error,
+	    message: stderr
+	  }));
+	  res.end();
+	}
       } else {
-        // print stuff
-        res.write(stdout);
-        process.stderr.write(stderr);
-        // and proceed to the next one
-        run_sequence(commands.slice(1), res, done);
+	// print stuff
+	res.write(stdout);
+	process.stderr.write(stderr);
+	// and proceed to the next one
+	run_sequence(commands.slice(1), res, done);
       }
     })
   } else {
@@ -44,20 +73,19 @@ function run_sequence(commands, res, done) {
   }
 }
 
-
-app.get('/', function (req, res) {
-  var conf = require('./config.json'),
-    addr = server.address(),
-    url = 'http://' + addr.address + ':' + addr.port + '/test';
+app.get(config.configURL || '/config', function (req, res) {
+  var conf = config,
+      addr = server.address(),
+      url = 'http://' + addr.address + ':' + addr.port + '/test';
   conf['To execute the tests, go here: '] = url;
   conf[' or specify a reporter: '] = url+'?reporter=tap'
   res.send(conf);
 });
 
-app.get('/test', function (req, res) {
+app.get(config.testURL || '/test', function (req, res) {
   var conf = require('./config.json'),
-    reporter = req.param('reporter') || conf.default_reporter,
-    commands;
+      reporter = req.param('reporter') || conf.default_reporter,
+      commands;
 
   // sanitize
   reporter = reporter.replace(/[^A-Za-z_-]/, '');
@@ -65,6 +93,7 @@ app.get('/test', function (req, res) {
   process.chdir(dir);
   // and chdir from there
   process.chdir(conf.cwd);
+  console.log(new Date())
   console.log('cd ' + process.cwd());
 
   commands = (conf.commands.before || []).concat();
